@@ -1,0 +1,1 @@
+{ "name": "cnpj-finder", "main": "server.js", "scripts": { "start": "node server.js" }, "dependencies": { "axios": "*", "cors": "*", "dotenv": "*", "express": "*" } }

@@ -1,0 +1,84 @@
+[
+    {
+        "cnpj": "52918884000161",
+        "email": "arenabccwb@gmail.com",
+        "razao_social": "Arena Beach Club Cwb LTDA (MOCK)",
+        "nome_fantasia": "Arena Beach Club",
+        "data_abertura": "2023-11-17",
+        "situacao_cadastral": {
+            "data": "2023-11-17",
+            "codigo_motivo": null,
+            "descricao_motivo": ""
+        },
+        "capital_social": "300000",
+        "tipo": "MATRIZ",
+        "situacao": "ATIVA",
+        "natureza_juridica": "Sociedade Empresária Limitada",
+        "endereco": {
+            "cep": "80330-140",
+            "tipo_logradouro": "Rua",
+            "logradouro": "José Júlio Biscaia",
+            "numero": "361",
+            "complemento": "",
+            "bairro": "Portão",
+            "cidade": {
+                "nome": "Curitiba",
+                "latitude": "-49.2653819",
+                "longitude": "-25.4244287"
+            },
+            "estado": {
+                "nome": "Paraná",
+                "sigla": "PR"
+            },
+            "pais": {
+                "nome": "Brasil",
+                "sigla": "BR"
+            }
+        },
+        "porte_empresa": "MICRO EMPRESA",
+        "simples": {
+            "optante": true,
+            "data_opcao": "2023-11-17",
+            "data_exclusao": null
+        },
+        "mei": {
+            "mei": false,
+            "complemento_razao_social": null
+        },
+        "situacao_especial": {
+            "status": null,
+            "data": null
+        },
+        "telefones": [
+            "(41) 98807-0655"
+        ],
+        "telefones_tipo": [
+            "celular"
+        ],
+        "atividades_principal": [
+            "93.11-5-00 - Gestão de instalações de esportes"
+        ],
+        "atividades_secundarias": [
+            "56.11-2-01 - Restaurantes e similares"
+        ],
+        "socios": [
+            "Bruno Felipe Gouveia Teixeira"
+        ]
+    },
+    {
+        "cnpj": "00000000000000",
+        "email": "teste@exemplo.com",
+        "razao_social": "Exemplo Rio de Janeiro LTDA",
+        "nome_fantasia": "Exemplo Rio",
+        "situacao": "ATIVA",
+        "endereco": {
+            "cidade": {
+                "nome": "Rio de Janeiro"
+            },
+            "estado": {
+                "nome": "Rio de Janeiro",
+                "sigla": "RJ"
+            }
+        }
+    }
+]
