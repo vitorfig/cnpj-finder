@@ -488,6 +488,60 @@
             height: 140px;
             resize: vertical;
         }
+
+        /* Status das APIs */
+        .status-box {
+            border: 1.5px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            background: #fcfcfc;
+        }
+
+        .status-box-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0.75rem;
+        }
+
+        .status-box-title {
+            font-weight: 700;
+        }
+
+        .status-box-account {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .status-box-message {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot-pending {
+            background: var(--text-light);
+        }
+
+        .status-dot-ok {
+            background: var(--merkos-green);
+        }
+
+        .status-dot-error {
+            background: var(--merkos-red);
+        }
+
+        .status-dot-warning {
+            background: var(--merkos-gold);
+        }
     </style>
 </head>
 
@@ -522,19 +576,27 @@
             <div id="side-master" class="nav-item" onclick="switchSideTab('master')">
                 <div class="nav-icon"><i data-lucide="zap"></i></div>
                 <div class="nav-text">
-                    <div class="nav-title">Busca Completa</div>
-                    <div class="nav-subtitle">Busca Completa</div>
+                    <div class="nav-title">Busca Completa por Cidade</div>
+                    <div class="nav-subtitle">Busca Completa por Cidade</div>
                 </div>
             </div>
             <div id="side-national" class="nav-item" onclick="switchSideTab('national')">
                 <div class="nav-icon"><i data-lucide="globe"></i></div>
                 <div class="nav-text">
-                    <div class="nav-title">Busca Nacional</div>
+                    <div class="nav-title">Busca Nacional por Estados</div>
                     <div class="nav-subtitle">Por estado, sem cidades</div>
+                </div>
+            </div>
+            <div id="side-status" class="nav-item" onclick="switchSideTab('status')">
+                <div class="nav-icon"><i data-lucide="activity"></i></div>
+                <div class="nav-text">
+                    <div class="nav-title">Status das APIs</div>
+                    <div class="nav-subtitle">Google, CNPJ.biz, BigData</div>
                 </div>
             </div>
         </nav>
         <div style="padding: 1.5rem; border-top: 1px solid var(--border); text-align: center;">
+            <button onclick="logout()" class="secondary-btn" style="width: 100%; margin-bottom: 1rem;">Sair</button>
             <p
                 style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
                 Merkos Intelligence © 2026</p>
@@ -676,6 +738,7 @@
                                     <th>Identificação</th>
                                     <th>Vínculo / Razão Social</th>
                                     <th>Localidade</th>
+                                    <th>Data de Fundação</th>
                                     <th>Score</th>
                                 </tr>
                             </thead>
@@ -833,6 +896,7 @@
                                     <th>Telefone Google Place</th>
                                     <th>CNPJ</th>
                                     <th>Razão Social</th>
+                                    <th>Data de Fundação</th>
                                     <th>Sócios & WhatsApp (Live)</th>
                                 </tr>
                             </thead>
@@ -845,7 +909,7 @@
             <div id="tab-national" class="tab-pane">
                 <div class="card">
                     <div style="text-align: center; margin-bottom: 3rem;">
-                        <div class="card-title">Busca Nacional <span class="chip chip-blue" style="font-size: 0.65rem; vertical-align: middle;">TEXT SEARCH</span></div>
+                        <div class="card-title">Busca Nacional por Estados <span class="chip chip-blue" style="font-size: 0.65rem; vertical-align: middle;">TEXT SEARCH</span></div>
                         <p style="color: var(--text-muted);">Busca por segmento em estados inteiros. Ideal para nichos raros.</p>
                     </div>
 
@@ -931,11 +995,61 @@
                                     <th>Telefone Google Place</th>
                                     <th>CNPJ</th>
                                     <th>Razão Social</th>
+                                    <th>Data de Fundação</th>
                                     <th>Sócios & WhatsApp (Live)</th>
                                 </tr>
                             </thead>
                             <tbody id="national-table-body"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA 6: STATUS DAS APIS -->
+            <div id="tab-status" class="tab-pane">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Status das Conexões</div>
+                        <button class="primary-button" onclick="checkApiStatus()" id="btn-status-refresh">VERIFICAR
+                            AGORA</button>
+                    </div>
+                    <p id="status-last-checked" style="color: var(--text-muted); margin-bottom: 1.5rem;">Ainda não
+                        verificado.</p>
+
+                    <div id="status-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                        <div class="status-box" id="status-google">
+                            <div class="status-box-header">
+                                <span class="status-dot status-dot-pending"></span>
+                                <span class="status-box-title">Google Maps API</span>
+                            </div>
+                            <p class="status-box-account">Conta: vitor.flores@merkos.com.br</p>
+                            <p class="status-box-message">Aguardando verificação...</p>
+                        </div>
+                        <div class="status-box" id="status-cnpjbiz">
+                            <div class="status-box-header">
+                                <span class="status-dot status-dot-pending"></span>
+                                <span class="status-box-title">CNPJ.biz</span>
+                            </div>
+                            <p class="status-box-account">Conta: vitor.flores@merkos.com.br</p>
+                            <p class="status-box-message">Aguardando verificação...</p>
+                        </div>
+                        <div class="status-box" id="status-bigdatacorp">
+                            <div class="status-box-header">
+                                <span class="status-dot status-dot-pending"></span>
+                                <span class="status-box-title">BigDataCorp</span>
+                            </div>
+                            <p class="status-box-account">Conta: vitor.flores@merkos.com.br</p>
+                            <p class="status-box-message">Aguardando verificação...</p>
+                        </div>
+                        <div class="status-box" id="status-github">
+                            <div class="status-box-header">
+                                <span class="status-dot status-dot-ok"></span>
+                                <span class="status-box-title">GitHub (Hospedagem do Código)</span>
+                            </div>
+                            <p class="status-box-account">Conta: vitorpaulosf@gmail.com</p>
+                            <p class="status-box-account">Usuário: vitorfig</p>
+                            <p class="status-box-message">Informativo — não monitorado automaticamente.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -948,7 +1062,12 @@
     <script src="deep_search.js"></script>
     <script src="master_search.js"></script>
     <script src="national_search.js"></script>
+    <script src="status.js"></script>
     <script>
+        function logout() {
+            fetch('/api/logout', { method: 'POST' }).then(() => window.location.href = '/login.html');
+        }
+
         function switchSideTab(tabId) {
             // Update Sidebar UI
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -963,12 +1082,17 @@
                 'google': '1. Busca no Google',
                 'biz': '2. Registro de CNPJ',
                 'deep': '3. Busca de Sócios',
-                'master': '4. Busca Completa',
-                'national': '5. Busca Nacional'
+                'master': '4. Busca Completa por Cidade',
+                'national': '5. Busca Nacional por Estados',
+                'status': '6. Status das APIs'
             };
             document.getElementById('header-label').textContent = labels[tabId];
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (tabId === 'status' && typeof checkApiStatus === 'function') {
+                checkApiStatus();
+            }
         }
 
         // Initialize Global Logic

@@ -3,3 +3,4 @@ node_modules/
 *.log
 *.txt
 legacy_python/
+.cnpj_biz_status.json

@@ -71,7 +71,7 @@ function renderNationalResults(results) {
     tableBody.innerHTML = '';
 
     if (results.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">Nenhum resultado encontrado.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">Nenhum resultado encontrado.</td></tr>';
         return;
     }
 
@@ -97,6 +97,8 @@ function renderNationalResults(results) {
         const razaoHtml = res.biz.razao_social && res.biz.razao_social !== 'N/A' ? `
             <div style="font-weight: 600; font-size: 0.875rem;">${res.biz.razao_social}</div>
         ` : `<span class="chip chip-gray">Não localizada</span>`;
+
+        const foundingHtml = `<div style="font-size: 0.875rem;">${formatFoundingDate(res.biz.data_abertura)}</div>`;
 
         let deepHtml = '';
         if (res.deep.socios && res.deep.socios.length > 0) {
@@ -130,6 +132,7 @@ function renderNationalResults(results) {
             <td>${socialHtml}</td>
             <td>${cnpjHtml}</td>
             <td>${razaoHtml}</td>
+            <td>${foundingHtml}</td>
             <td style="max-width: 320px;">${deepHtml}</td>
         `;
         tableBody.appendChild(tr);
@@ -148,7 +151,7 @@ function formatNationalCNPJ(cnpj) {
 function exportNationalCSV() {
     if (!window.lastNationalResults || window.lastNationalResults.length === 0) return;
 
-    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram\n';
+    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Data de Fundação;Sócios;Telefones Live;Website;Instagram\n';
     window.lastNationalResults.forEach(res => {
         const sociosStr = (res.deep.socios || []).map(s => `${s.nome} (${s.fim})`).join(' | ');
         const telsList = [];
@@ -162,6 +165,7 @@ function exportNationalCSV() {
             res.google.endereco,
             formatNationalCNPJ(res.biz.cnpj),
             res.biz.razao_social || 'N/A',
+            formatFoundingDate(res.biz.data_abertura),
             sociosStr,
             telsList.join(' | '),
             res.google.website || 'N/A',

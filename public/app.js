@@ -124,6 +124,7 @@ async function searchBiz() {
                             ${auditHtml}
                         </td>
                         <td>${emp.cidade || c || '-'} / ${emp.uf || s || '-'}</td>
+                        <td>${formatFoundingDate(emp.data_abertura)}</td>
                         <td><span class="chip ${emp.score >= 120 ? 'chip-green' : 'chip-blue'}">${emp.score || 0} pts</span></td>
                     `;
                     resBody.appendChild(row);
@@ -131,12 +132,17 @@ async function searchBiz() {
             } else {
                 const row = document.createElement('tr');
                 row.style.background = '#fff8f8';
+
+                const message = res.creditError
+                    ? `<span style="color: var(--merkos-red); font-weight: 700;">⚠️ Sem créditos no CNPJ.biz</span><br><span style="font-size: 0.75rem; color: var(--text-muted);">${res.creditError}</span>`
+                    : `<span style="color: var(--text-muted); font-style: italic;">Nenhum match com score suficiente encontrado.</span>`;
+
                 row.innerHTML = `
                     <td>
                         <div style="font-weight:600;">${currentName}</div>
                         <div style="font-size:0.75rem; color:var(--text-muted);">${currentAddress}</div>
                     </td>
-                    <td colspan="3" style="color: var(--text-muted); font-style: italic;">Nenhum match com score suficiente encontrado.</td>
+                    <td colspan="4">${message}</td>
                 `;
                 resBody.appendChild(row);
             }
@@ -155,21 +161,29 @@ function formatCNPJ(cnpj) {
     return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 
+function formatFoundingDate(dateStr) {
+    if (!dateStr) return '-';
+    const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return dateStr;
+    return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
 function exportCSVBiz() {
     const rows = Array.from(document.querySelectorAll('#res-body-biz tr'));
     if (rows.length === 0) return alert('Sem dados para exportar.');
 
-    let csv = 'Termo;CNPJ;Razao Social;Localizacao;Score\n';
+    let csv = 'Termo;CNPJ;Razao Social;Localizacao;Data de Fundacao;Score\n';
     rows.forEach(tr => {
         const tds = tr.querySelectorAll('td');
-        if (tds.length < 4) return;
+        if (tds.length < 5) return;
 
         const termo = tds[0].innerText.replace(/\n/g, ' - ');
         const razao = tds[1].innerText.replace(/\n/g, ' - ');
         const local = tds[2].innerText;
-        const score = tds[3].innerText;
+        const fundacao = tds[3].innerText;
+        const score = tds[4].innerText;
 
-        csv += `"${termo}";"${razao}";"${local}";"${score}"\n`;
+        csv += `"${termo}";"${razao}";"${local}";"${fundacao}";"${score}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

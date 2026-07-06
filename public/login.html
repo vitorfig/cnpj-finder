@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Merkos Intelligence</title>
+    <link rel="icon" type="image/png" href="/Logos/merkos_símbolo_vermelho.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --merkos-red: #CE002C;
+            --merkos-red-dark: #9E001E;
+            --merkos-red-deep: #350B12;
+            --bg-body: #f5f7ef;
+            --bg-card: #ffffff;
+            --text-main: #3C3C3C;
+            --text-muted: #9C9C9C;
+            --border: #E8E8E8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border-radius: 1.25rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-logo img {
+            max-width: 160px;
+            height: auto;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--merkos-red-deep);
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.6rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.875rem 1.125rem;
+            border: 1.5px solid var(--border);
+            border-radius: 0.875rem;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            background: #ffffff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--merkos-red);
+            box-shadow: 0 0 0 4px rgba(206, 0, 44, 0.08);
+        }
+
+        .primary-button {
+            background-color: var(--merkos-red);
+            color: #ffffff;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 0.875rem;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.25s, transform 0.2s;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        .primary-button:hover {
+            background-color: var(--merkos-red-dark);
+            transform: translateY(-2px);
+        }
+
+        .primary-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #error-message {
+            display: none;
+            padding: 0.875rem 1.125rem;
+            background: #fee2e2;
+            border-radius: 0.875rem;
+            color: #b91c1c;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <div class="login-logo">
+            <img src="/Logos/merkos_cor_horizontal.png" alt="Merkos Logo">
+        </div>
+        <h1>Acesso Restrito</h1>
+
+        <div id="error-message"></div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="email">E-mail</label>
+                <input type="email" id="email" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" id="btn-login" class="primary-button">ENTRAR</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const errorBox = document.getElementById('error-message');
+        const btn = document.getElementById('btn-login');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorBox.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'ENTRANDO...';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('email').value.trim(),
+                        password: document.getElementById('password').value
+                    })
+                });
+
+                if (res.ok) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                const data = await res.json().catch(() => ({}));
+                errorBox.textContent = data.error || 'Falha ao entrar.';
+                errorBox.style.display = 'block';
+            } catch (err) {
+                errorBox.textContent = 'Erro de conexão com o servidor.';
+                errorBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ENTRAR';
+            }
+        });
+    </script>
+</body>
+
+</html>

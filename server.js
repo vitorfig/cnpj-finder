@@ -2,23 +2,113 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const app = express();
-
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-app.use('/Logos', express.static(path.join(__dirname, 'Logos')));
 
 const PORT = 3000;
 const CNPJ_BIZ_TOKEN = process.env.CNPJ_BIZ_TOKEN;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const USE_MOCK = process.env.USE_MOCK === 'true';
+const AUTH_EMAIL = process.env.AUTH_EMAIL;
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+
+// --- AUTENTICAÇÃO (sessão via cookie assinado, sem dependências extras) ---
+function parseCookies(header) {
+    const out = {};
+    if (!header) return out;
+    header.split(';').forEach(pair => {
+        const idx = pair.indexOf('=');
+        if (idx === -1) return;
+        out[pair.slice(0, idx).trim()] = decodeURIComponent(pair.slice(idx + 1).trim());
+    });
+    return out;
+}
+
+function signSession(payload) {
+    const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const sig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('base64url');
+    return `${data}.${sig}`;
+}
+
+function verifySession(token) {
+    if (!token) return null;
+    const [data, sig] = token.split('.');
+    if (!data || !sig) return null;
+    const expected = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('base64url');
+    const sigBuf = Buffer.from(sig);
+    const expectedBuf = Buffer.from(expected);
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+        if (!payload.exp || payload.exp < Date.now()) return null;
+        return payload;
+    } catch {
+        return null;
+    }
+}
+
+const PUBLIC_PATHS = new Set(['/login.html', '/api/login']);
+
+app.use(cors());
+app.use(express.json());
+
+app.use((req, res, next) => {
+    if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/Logos')) return next();
+    const { session } = parseCookies(req.headers.cookie);
+    if (!verifySession(session)) {
+        if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Não autenticado' });
+        return res.redirect('/login.html');
+    }
+    next();
+});
+
+app.post('/api/login', (req, res) => {
+    const { email, password } = req.body || {};
+    const emailBuf = Buffer.from(String(email || ''));
+    const authEmailBuf = Buffer.from(AUTH_EMAIL);
+    const emailOk = emailBuf.length === authEmailBuf.length && crypto.timingSafeEqual(emailBuf, authEmailBuf);
+
+    const passBuf = Buffer.from(String(password || ''));
+    const authPassBuf = Buffer.from(AUTH_PASSWORD);
+    const passOk = passBuf.length === authPassBuf.length && crypto.timingSafeEqual(passBuf, authPassBuf);
+
+    if (!emailOk || !passOk) return res.status(401).json({ error: 'E-mail ou senha inválidos' });
+
+    const token = signSession({ email, exp: Date.now() + SESSION_MAX_AGE_MS });
+    res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/; Max-Age=${SESSION_MAX_AGE_MS / 1000}; SameSite=Lax`);
+    res.json({ ok: true });
+});
+
+app.post('/api/logout', (req, res) => {
+    res.setHeader('Set-Cookie', 'session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+    res.json({ ok: true });
+});
+
+app.use(express.static('public'));
+app.use('/Logos', express.static(path.join(__dirname, 'Logos')));
 
 // --- COST TRACKING (logging only, no global limit) ---
 let globalPaidCreditsSpent = 0;
 // Regra: cada empresa gasta 1 busca grátis (contar) + máx 1 crédito pago (listar-com-dados)
+
+// Última falha conhecida do CNPJ.biz ao tentar enriquecimento pago (ex: sem créditos).
+// Persistida em disco para sobreviver a reinícios do servidor.
+const CNPJ_BIZ_STATUS_FILE = path.join(__dirname, '.cnpj_biz_status.json');
+let cnpjBizLastPaidError = null;
+try {
+    cnpjBizLastPaidError = JSON.parse(fs.readFileSync(CNPJ_BIZ_STATUS_FILE, 'utf8')).lastPaidError;
+} catch { /* sem cache ainda */ }
+
+function setCnpjBizLastPaidError(value) {
+    cnpjBizLastPaidError = value;
+    try {
+        fs.writeFileSync(CNPJ_BIZ_STATUS_FILE, JSON.stringify({ lastPaidError: value }));
+    } catch { /* falha ao persistir, segue só em memória */ }
+}
 
 
 // --- GOOGLE PLACES LOGIC (Ported from Python) ---
@@ -182,8 +272,8 @@ function shouldExclude(nome, types) {
 
 // Configurações Big Data Corp (Deep Search)
 const BDC_HEADERS = {
-    'AccessToken': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiVklUT1IuRkxPUkVTQE1FUktPUy5DT00uQlIiLCJqdGkiOiJmNzRmNTQxMi0xNjBmLTQwZDItYmIxMC03YjZiNTgwMDYzNTMiLCJuYW1lVXNlciI6IlZpdG9yIEZsb3JlcyIsInVuaXF1ZV9uYW1lIjoiVklUT1IuRkxPUkVTQE1FUktPUy5DT00uQlIiLCJkb21haW4iOiJNRVJLT1MiLCJwcm9kdWN0cyI6WyJCSUdCT09TVCIsIkJJR0lEIl0sIm5iZiI6MTc2Nzc5ODYwOSwiZXhwIjoxNzk5MzM0NjA5LCJpYXQiOjE3Njc3OTg2MDksImlzcyI6IkJpZyBEYXRhIENvcnAuIn0.HGi-DTrm5R_pCLFWaRbjm-RILk7w1IXpz1yhqU4C6xU',
-    'TokenId': '695e77515869866fa3abfc75',
+    'AccessToken': process.env.BDC_ACCESS_TOKEN,
+    'TokenId': process.env.BDC_TOKEN_ID,
     'Content-Type': 'application/json'
 };
 
@@ -285,7 +375,6 @@ async function runGoogleSearch(estado, cidades, segment, limit = 0) {
             if (!coords) continue;
 
             const { pontos, raio } = calculateGrid(coords.viewport);
-            let cityResults = [];
 
             for (const p of pontos) {
                 const places = await searchNearby(p.lat, p.lng, raio, segment);
@@ -296,7 +385,7 @@ async function runGoogleSearch(estado, cidades, segment, limit = 0) {
                         excluidos++;
                         continue;
                     }
-                    if (cityResults.some(r => r.place_id === place.place_id)) continue;
+                    if (allResults.some(r => r.place_id === place.place_id)) continue;
 
                     const details = await getPlaceDetails(place.place_id);
                     const fullAddress = details.endereco_completo || place.endereco;
@@ -473,24 +562,34 @@ async function runBizSearchForCompany(name, address_query, segment, city_name, s
 
 async function enrichCompany(term, field, city_name, state, queryName, queryAddress, segment) {
     try {
-        const enrichPayload = {
-            [field]: [term],
-            "limit": 3, // Fetch up to 3 to compare
-            "situacao": ["ativa"]
+        const buildEnrichPayload = (withCity) => {
+            const payload = { [field]: [term], "limit": 3, "situacao": ["ativa"] };
+            if (withCity && city_name && state) {
+                payload.localidades = [{ "tipo": "cidade", "cidade": city_name, "estado": state, "pais": "BR" }];
+            } else if (state) {
+                payload.localidades = [{ "tipo": "estado", "estado": state, "pais": "BR" }];
+            }
+            return payload;
         };
-        if (city_name && state) {
-            enrichPayload.localidades = [{ "tipo": "cidade", "cidade": city_name, "estado": state, "pais": "BR" }];
-        } else if (state) {
-            enrichPayload.localidades = [{ "tipo": "estado", "estado": state, "pais": "BR" }];
-        }
 
-        const enrichRes = await axios.post('https://cnpj.biz/api/v2/empresas/listar-com-dados', enrichPayload, {
+        let enrichRes = await axios.post('https://cnpj.biz/api/v2/empresas/listar-com-dados', buildEnrichPayload(true), {
             headers: { 'Authorization': `Bearer ${CNPJ_BIZ_TOKEN}`, 'Content-Type': 'application/json' }
         });
+        let firms = enrichRes.data.firms || (Array.isArray(enrichRes.data) ? enrichRes.data : []);
 
-        const firms = enrichRes.data.firms || (Array.isArray(enrichRes.data) ? enrichRes.data : []);
+        // CNPJ.biz tem uma inconsistência conhecida: /contar acha resultado com filtro de cidade,
+        // mas /listar-com-dados retorna vazio com o mesmo filtro. Tenta de novo só com o estado.
+        if (firms.length === 0 && city_name && state) {
+            console.log(`   ⚠️ Enriquecimento vazio com filtro de cidade — tentando novamente só com o estado...`);
+            enrichRes = await axios.post('https://cnpj.biz/api/v2/empresas/listar-com-dados', buildEnrichPayload(false), {
+                headers: { 'Authorization': `Bearer ${CNPJ_BIZ_TOKEN}`, 'Content-Type': 'application/json' }
+            });
+            firms = enrichRes.data.firms || (Array.isArray(enrichRes.data) ? enrichRes.data : []);
+        }
+
         if (firms.length > 0) {
             globalPaidCreditsSpent++;
+            setCnpjBizLastPaidError(null); // chamada paga funcionou, limpa aviso de crédito
 
             // Score ALL candidates and pick the best one above threshold
             const MIN_SCORE = 50;
@@ -513,6 +612,7 @@ async function enrichCompany(term, field, city_name, state, queryName, queryAddr
                     razao_social: bestResult.firm.razao_social,
                     nome_fantasia: bestResult.firm.nome_fantasia,
                     cidade: bestResult.firm.endereco?.cidade?.nome || city_name || 'N/A',
+                    data_abertura: bestResult.firm.data_abertura || null,
                     audit: bestResult.scored.breakdown,
                     score: bestResult.scored.score
                 };
@@ -521,7 +621,10 @@ async function enrichCompany(term, field, city_name, state, queryName, queryAddr
             }
         }
     } catch (e) {
-        // skip silently
+        setCnpjBizLastPaidError({
+            time: new Date().toISOString(),
+            message: e.response?.data?.message || e.message
+        });
     }
     return null;
 }
@@ -646,16 +749,23 @@ app.post('/api/search', async (req, res) => {
                 return { ...emp, _score: result.score, _breakdown: result.breakdown };
             }).sort((a, b) => b._score - a._score);
             const winners = filtered.filter(w => w._score >= 120).slice(0, 1);
-            const data = winners.map(emp => ({ cnpj: emp.cnpj, razao_social: emp.razao_social, nome_fantasia: emp.nome_fantasia, cidade: emp.endereco?.cidade?.nome || city_name || 'N/A', audit: emp._breakdown }));
+            const data = winners.map(emp => ({ cnpj: emp.cnpj, razao_social: emp.razao_social, nome_fantasia: emp.nome_fantasia, cidade: emp.endereco?.cidade?.nome || city_name || 'N/A', data_abertura: emp.data_abertura || null, audit: emp._breakdown }));
             return res.json({ data, data_count: data.length, stats: { counts: candidates.length, details: candidates.length }, all_candidates: filtered.map(c => ({ razao: c.razao_social, cnpj: c.cnpj, score: c._score, breakdown: c._breakdown })) });
         } catch (err) { return res.status(500).json({ error: "Erro ao carregar mock data" }); }
     }
 
     let cityName = city_name || null;
     try {
+        const errorBefore = cnpjBizLastPaidError;
         const bizResult = await runBizSearchForCompany(name, address_query, segment, cityName, state);
-        const data = bizResult ? [{ cnpj: bizResult.cnpj, razao_social: bizResult.razao_social, nome_fantasia: bizResult.nome_fantasia, cidade: bizResult.cidade, audit: bizResult.audit }] : [];
-        res.json({ data, data_count: data.length, stats: { counts: bizResult ? 1 : 0, details: bizResult ? 1 : 0 }, all_candidates: bizResult ? [{ razao: bizResult.razao_social, cnpj: bizResult.cnpj, score: bizResult.score, breakdown: bizResult.audit }] : [] });
+
+        let creditError = null;
+        if (!bizResult && cnpjBizLastPaidError && cnpjBizLastPaidError !== errorBefore) {
+            creditError = cnpjBizLastPaidError.message;
+        }
+
+        const data = bizResult ? [{ cnpj: bizResult.cnpj, razao_social: bizResult.razao_social, nome_fantasia: bizResult.nome_fantasia, cidade: bizResult.cidade, data_abertura: bizResult.data_abertura || null, audit: bizResult.audit }] : [];
+        res.json({ data, data_count: data.length, stats: { counts: bizResult ? 1 : 0, details: bizResult ? 1 : 0 }, all_candidates: bizResult ? [{ razao: bizResult.razao_social, cnpj: bizResult.cnpj, score: bizResult.score, breakdown: bizResult.audit }] : [], creditError });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -775,6 +885,7 @@ async function runBizSearchNational(name, address_query, segment, city_name, sta
                     razao_social: firm.razao_social,
                     nome_fantasia: firm.nome_fantasia,
                     cidade: firm.endereco?.cidade?.nome || city_name || 'N/A',
+                    data_abertura: firm.data_abertura || null,
                     audit: {},
                     score: 1
                 };
@@ -924,6 +1035,57 @@ app.get('/api/admin/reset-credits', (req, res) => {
     globalPaidCreditsSpent = 0;
     console.log("♻️ [ADMIN] Contador de créditos resetado manualmente.");
     res.json({ success: true, message: "Contador de créditos resetado para 0." });
+});
+
+// --- STATUS DAS APIS EXTERNAS ---
+async function checkGoogleStatus() {
+    try {
+        const res = await axios.get("https://maps.googleapis.com/maps/api/geocode/json", {
+            params: { address: "São Paulo, SP, Brasil", key: GOOGLE_API_KEY, language: "pt-BR" }
+        });
+        if (res.data.status === "OK") {
+            return { ok: true, message: "Conectado" };
+        }
+        return { ok: false, message: res.data.error_message || res.data.status };
+    } catch (e) {
+        return { ok: false, message: e.response?.data?.error_message || e.message };
+    }
+}
+
+async function checkCnpjBizStatus() {
+    try {
+        await axios.post('https://cnpj.biz/api/v2/empresas/contar', {
+            razao_fantasia: ["PETROBRAS"],
+            situacao: ["ativa"]
+        }, {
+            headers: { 'Authorization': `Bearer ${CNPJ_BIZ_TOKEN}`, 'Content-Type': 'application/json' }
+        });
+        return { ok: true, message: "Conectado", lastPaidError: cnpjBizLastPaidError };
+    } catch (e) {
+        return { ok: false, message: e.response?.data?.message || e.message, lastPaidError: cnpjBizLastPaidError };
+    }
+}
+
+async function checkBigDataCorpStatus() {
+    try {
+        const res = await axios.post("https://plataforma.bigdatacorp.com.br/empresas", {
+            "Datasets": "basic_data",
+            "q": "doc{33000167000101}" // Petrobras, usado só para testar conectividade
+        }, { headers: BDC_HEADERS });
+        if (res.data.Result) return { ok: true, message: "Conectado" };
+        return { ok: false, message: "Resposta inesperada da API" };
+    } catch (e) {
+        return { ok: false, message: e.response?.data?.Message || e.response?.data?.message || e.message };
+    }
+}
+
+app.get('/api/status', async (req, res) => {
+    const [google, cnpjBiz, bigDataCorp] = await Promise.all([
+        checkGoogleStatus(),
+        checkCnpjBizStatus(),
+        checkBigDataCorpStatus()
+    ]);
+    res.json({ checkedAt: new Date().toISOString(), google, cnpjBiz, bigDataCorp });
 });
 
 app.listen(PORT, () => console.log(`Servidor de Inteligência Híbrida em http://localhost:${PORT}`));

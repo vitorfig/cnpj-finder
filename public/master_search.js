@@ -117,6 +117,9 @@ function renderMasterResults(results) {
             <div style="font-weight: 600; font-size: 0.875rem; color: var(--text-main);">${res.biz.razao_social}</div>
         ` : `<span class="chip chip-gray">Não localizada</span>`;
 
+        // 4b. Data de Fundação Column
+        const foundingHtml = `<div style="font-size: 0.875rem;">${formatFoundingDate(res.biz.data_abertura)}</div>`;
+
         // 5. Deep Data (Live Partners)
         let deepHtml = '';
         if (res.deep.socios && res.deep.socios.length > 0) {
@@ -159,6 +162,7 @@ function renderMasterResults(results) {
             <td>${socialHtml}</td>
             <td>${cnpjHtml}</td>
             <td>${razaoHtml}</td>
+            <td>${foundingHtml}</td>
             <td style="max-width: 320px;">${deepHtml}</td>
         `;
         tableBody.appendChild(tr);
@@ -177,7 +181,7 @@ function formatCNPJ(cnpj) {
 function exportMasterCSV() {
     if (!window.lastMasterResults) return;
 
-    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram\n';
+    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Data de Fundação;Sócios;Telefones Live;Website;Instagram\n';
     window.lastMasterResults.forEach(res => {
         const sociosStr = res.deep.socios.map(s => `${s.nome} (${s.fim})`).join(' | ');
         const telsList = [];
@@ -193,6 +197,7 @@ function exportMasterCSV() {
             res.google.endereco,
             formatCNPJ(res.biz.cnpj),
             res.biz.razao_social,
+            formatFoundingDate(res.biz.data_abertura),
             sociosStr,
             telsList.join(' | '),
             res.google.website,
