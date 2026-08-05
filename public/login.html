@@ -130,6 +130,34 @@
             font-size: 0.875rem;
             margin-bottom: 1.25rem;
         }
+
+        .mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+            background: #f1f5f9;
+            border-radius: 0.875rem;
+            padding: 0.35rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 0.7rem 0.5rem;
+            border: none;
+            border-radius: 0.625rem;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #ffffff;
+            color: var(--merkos-red);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
     </style>
 </head>
 
@@ -139,6 +167,13 @@
             <img src="/Logos/merkos_cor_horizontal.png" alt="Merkos Logo">
         </div>
         <h1>Acesso Restrito</h1>
+
+        <div class="mode-toggle">
+            <button type="button" class="mode-btn active" id="mode-full" onclick="setMode('full')">APLICAÇÃO
+                COMPLETA</button>
+            <button type="button" class="mode-btn" id="mode-simplificada" onclick="setMode('simplificada')">APLICAÇÃO
+                SIMPLIFICADA</button>
+        </div>
 
         <div id="error-message"></div>
 
@@ -159,6 +194,13 @@
         const form = document.getElementById('login-form');
         const errorBox = document.getElementById('error-message');
         const btn = document.getElementById('btn-login');
+        let selectedMode = 'full';
+
+        function setMode(mode) {
+            selectedMode = mode;
+            document.getElementById('mode-full').classList.toggle('active', mode === 'full');
+            document.getElementById('mode-simplificada').classList.toggle('active', mode === 'simplificada');
+        }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -172,16 +214,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email: document.getElementById('email').value.trim(),
-                        password: document.getElementById('password').value
+                        password: document.getElementById('password').value,
+                        mode: selectedMode
                     })
                 });
 
+                const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
-                    window.location.href = '/';
+                    window.location.href = data.role === 'simplificada' ? '/socios.html' : '/';
                     return;
                 }
 
-                const data = await res.json().catch(() => ({}));
                 errorBox.textContent = data.error || 'Falha ao entrar.';
                 errorBox.style.display = 'block';
             } catch (err) {

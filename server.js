@@ -13,6 +13,7 @@ const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const USE_MOCK = process.env.USE_MOCK === 'true';
 const AUTH_EMAIL = process.env.AUTH_EMAIL;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
+const AUTH_PASSWORD_SIMPLIFICADA = process.env.AUTH_PASSWORD_SIMPLIFICADA;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -53,34 +54,52 @@ function verifySession(token) {
 
 const PUBLIC_PATHS = new Set(['/login.html', '/api/login']);
 
+// Rotas de API que a conta "simplificada" (só Busca de Sócios) pode chamar
+const SIMPLIFICADA_ALLOWED_API = new Set(['/api/deep/search', '/api/logout']);
+// Páginas/assets estáticos que a conta "simplificada" pode carregar
+const SIMPLIFICADA_ALLOWED_PAGES = new Set(['/socios.html', '/deep_search.js']);
+
 app.use(cors());
 app.use(express.json());
 
 app.use((req, res, next) => {
     if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/Logos')) return next();
     const { session } = parseCookies(req.headers.cookie);
-    if (!verifySession(session)) {
+    const payload = verifySession(session);
+    if (!payload) {
         if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Não autenticado' });
         return res.redirect('/login.html');
     }
+
+    if (payload.role === 'simplificada') {
+        if (req.path.startsWith('/api/')) {
+            if (!SIMPLIFICADA_ALLOWED_API.has(req.path)) return res.status(403).json({ error: 'Acesso restrito' });
+        } else if (!SIMPLIFICADA_ALLOWED_PAGES.has(req.path)) {
+            return res.redirect('/socios.html');
+        }
+    }
+
     next();
 });
 
 app.post('/api/login', (req, res) => {
-    const { email, password } = req.body || {};
+    const { email, password, mode } = req.body || {};
+    const requestedMode = mode === 'simplificada' ? 'simplificada' : 'full';
+
     const emailBuf = Buffer.from(String(email || ''));
     const authEmailBuf = Buffer.from(AUTH_EMAIL);
     const emailOk = emailBuf.length === authEmailBuf.length && crypto.timingSafeEqual(emailBuf, authEmailBuf);
 
+    const expectedPassword = requestedMode === 'simplificada' ? AUTH_PASSWORD_SIMPLIFICADA : AUTH_PASSWORD;
     const passBuf = Buffer.from(String(password || ''));
-    const authPassBuf = Buffer.from(AUTH_PASSWORD);
+    const authPassBuf = Buffer.from(expectedPassword);
     const passOk = passBuf.length === authPassBuf.length && crypto.timingSafeEqual(passBuf, authPassBuf);
 
     if (!emailOk || !passOk) return res.status(401).json({ error: 'E-mail ou senha inválidos' });
 
-    const token = signSession({ email, exp: Date.now() + SESSION_MAX_AGE_MS });
+    const token = signSession({ email, role: requestedMode, exp: Date.now() + SESSION_MAX_AGE_MS });
     res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/; Max-Age=${SESSION_MAX_AGE_MS / 1000}; SameSite=Lax`);
-    res.json({ ok: true });
+    res.json({ ok: true, role: requestedMode });
 });
 
 app.post('/api/logout', (req, res) => {
