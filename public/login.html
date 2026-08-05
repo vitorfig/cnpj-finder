@@ -169,10 +169,10 @@
         <h1>Acesso Restrito</h1>
 
         <div class="mode-toggle">
-            <button type="button" class="mode-btn active" id="mode-full" onclick="setMode('full')">APLICAÇÃO
-                COMPLETA</button>
-            <button type="button" class="mode-btn" id="mode-simplificada" onclick="setMode('simplificada')">APLICAÇÃO
+            <button type="button" class="mode-btn active" id="mode-simplificada" onclick="setMode('simplificada')">APLICAÇÃO
                 SIMPLIFICADA</button>
+            <button type="button" class="mode-btn" id="mode-full" onclick="setMode('full')">APLICAÇÃO
+                COMPLETA</button>
         </div>
 
         <div id="error-message"></div>
@@ -194,7 +194,7 @@
         const form = document.getElementById('login-form');
         const errorBox = document.getElementById('error-message');
         const btn = document.getElementById('btn-login');
-        let selectedMode = 'full';
+        let selectedMode = 'simplificada';
 
         function setMode(mode) {
             selectedMode = mode;
