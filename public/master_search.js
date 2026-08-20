@@ -103,11 +103,12 @@ function renderMasterResults(results) {
         // 1. Nome do Negócio
         const googleNameHtml = `<div style="font-weight: 700; color: var(--merkos-red); font-size: 1rem;">${res.google.nome}</div>`;
 
-        // 2. Endereço (rua e número)
-        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${res.google.rua_numero || '-'}</div>`;
+        // 2. Endereço (rua e número, com CEP junto)
+        const ruaNumero = res.google.rua_numero && res.google.rua_numero !== 'N/A' ? res.google.rua_numero : '-';
+        const enderecoCompleto = res.google.cep && res.google.cep !== 'N/A' ? `${ruaNumero}, CEP: ${res.google.cep}` : ruaNumero;
+        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${enderecoCompleto}</div>`;
 
-        // 3-6. CEP / Cidade / Estado / País
-        const cepHtml = res.google.cep && res.google.cep !== 'N/A' ? res.google.cep : '-';
+        // 3-5. Cidade / Estado / País
         const cidadeHtml = res.google.cidade && res.google.cidade !== 'N/A' ? res.google.cidade : '-';
         const estadoHtml = res.google.estado && res.google.estado !== 'N/A' ? res.google.estado : '-';
         const paisHtml = res.google.pais && res.google.pais !== 'N/A' ? res.google.pais : '-';
@@ -163,13 +164,12 @@ function renderMasterResults(results) {
             <a href="${res.google.instagramUrl}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.instagramUrl}</a>
         ` : '-';
 
-        // 13. Ano de Fundação
-        const foundingYearHtml = res.biz.data_abertura ? String(res.biz.data_abertura).slice(0, 4) : '-';
+        // 13. Dia de Fundação
+        const foundingYearHtml = formatFoundingDate(res.biz.data_abertura);
 
         tr.innerHTML = `
             <td>${googleNameHtml}</td>
-            <td style="min-width: 180px;">${addressHtml}</td>
-            <td>${cepHtml}</td>
+            <td style="min-width: 200px;">${addressHtml}</td>
             <td>${cidadeHtml}</td>
             <td>${estadoHtml}</td>
             <td>${paisHtml}</td>
@@ -197,7 +197,7 @@ function formatCNPJ(cnpj) {
 function exportMasterCSV() {
     if (!window.lastMasterResults) return;
 
-    let csv = 'Nome do Negócio;Endereço;CEP;Cidade;Estado;País;Telefone (Google);CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram;Ano de Fundação\n';
+    let csv = 'Nome do Negócio;Endereço;Cidade;Estado;País;Telefone (Google);CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram;Dia de Fundação\n';
     window.lastMasterResults.forEach(res => {
         const sociosStr = res.deep.socios.map(s => `${s.nome} (${s.fim})`).join(' | ');
         const telsList = [];
@@ -208,10 +208,12 @@ function exportMasterCSV() {
             telsList.push(`${prefix}${t.display} (${s.nome.split(' ')[0]})`);
         }));
 
+        const ruaNumero = res.google.rua_numero && res.google.rua_numero !== 'N/A' ? res.google.rua_numero : '';
+        const enderecoCompleto = res.google.cep && res.google.cep !== 'N/A' ? `${ruaNumero}, CEP: ${res.google.cep}` : ruaNumero;
+
         const row = [
             res.google.nome,
-            res.google.rua_numero,
-            res.google.cep,
+            enderecoCompleto,
             res.google.cidade,
             res.google.estado,
             res.google.pais,
@@ -222,7 +224,7 @@ function exportMasterCSV() {
             telsList.join(' | '),
             res.google.website,
             res.google.instagramUrl,
-            res.biz.data_abertura ? String(res.biz.data_abertura).slice(0, 4) : ''
+            formatFoundingDate(res.biz.data_abertura)
         ].map(val => `"${(val || '').toString().replace(/"/g, '""')}"`);
 
         csv += row.join(';') + '\n';
