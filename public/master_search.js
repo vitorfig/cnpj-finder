@@ -100,27 +100,33 @@ function renderMasterResults(results) {
     results.forEach(res => {
         const tr = document.createElement('tr');
 
-        // 1. Google Name Column
+        // 1. Nome do Negócio
         const googleNameHtml = `<div style="font-weight: 700; color: var(--merkos-red); font-size: 1rem;">${res.google.nome}</div>`;
 
-        // 2. Address Column
-        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${res.google.endereco}</div>`;
+        // 2. Endereço (rua e número)
+        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${res.google.rua_numero || '-'}</div>`;
 
-        // 3. CNPJ Column
+        // 3-6. CEP / Cidade / Estado / País
+        const cepHtml = res.google.cep && res.google.cep !== 'N/A' ? res.google.cep : '-';
+        const cidadeHtml = res.google.cidade && res.google.cidade !== 'N/A' ? res.google.cidade : '-';
+        const estadoHtml = res.google.estado && res.google.estado !== 'N/A' ? res.google.estado : '-';
+        const paisHtml = res.google.pais && res.google.pais !== 'N/A' ? res.google.pais : '-';
+
+        // 7. Telefone (Google)
+        const telefoneHtml = res.google.telefone && res.google.telefone !== 'N/A' ? res.google.telefone : '-';
+
+        // 8. CNPJ
         const cnpjHtml = res.biz.cnpj !== 'Não encontrado' ? `
             <div style="font-weight: 700; font-size: 0.875rem;">${formatCNPJ(res.biz.cnpj)}</div>
             <div style="margin-top: 6px;"><span class="chip ${res.biz.score >= 120 ? 'chip-green' : 'chip-blue'}">${res.biz.score || 0} Match Score</span></div>
         ` : `<span class="chip chip-gray">N/A</span>`;
 
-        // 4. Razão Social Column
+        // 9. Razão Social
         const razaoHtml = res.biz.razao_social !== 'N/A' ? `
             <div style="font-weight: 600; font-size: 0.875rem; color: var(--text-main);">${res.biz.razao_social}</div>
         ` : `<span class="chip chip-gray">Não localizada</span>`;
 
-        // 4b. Data de Fundação Column
-        const foundingHtml = `<div style="font-size: 0.875rem;">${formatFoundingDate(res.biz.data_abertura)}</div>`;
-
-        // 5. Deep Data (Live Partners)
+        // 10. Sócios & WhatsApp (Live)
         let deepHtml = '';
         if (res.deep.socios && res.deep.socios.length > 0) {
             res.deep.socios.forEach(s => {
@@ -147,23 +153,33 @@ function renderMasterResults(results) {
             deepHtml = '<span class="chip chip-gray">Sem dados de sócios</span>';
         }
 
-        // 5. Social/Web
-        const socialHtml = `
-            <div style="display: flex; flex-direction: column; gap: 8px text-align: center;">
-                ${res.google.website !== 'N/A' ? `<a href="${res.google.website}" target="_blank" class="secondary-btn" style="text-align:center; font-size:0.75rem;">🌐 Website</a>` : ''}
-                ${res.google.instagram !== 'N/A' ? `<a href="https://instagram.com/${res.google.instagram.replace('@', '')}" target="_blank" class="secondary-btn" style="text-align:center; font-size:0.75rem; background:#fee2e2; color:#b91c1c;">📸 Instagram</a>` : ''}
-                ${res.google.telefone !== 'N/A' ? `<div style="font-size: 0.75rem; color: var(--text-muted); text-align:center;">📞 ${res.google.telefone}</div>` : ''}
-            </div>
-        `;
+        // 11. Website (URL original, clicável)
+        const websiteHtml = res.google.website && res.google.website !== 'N/A' ? `
+            <a href="${res.google.website}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.website}</a>
+        ` : '-';
+
+        // 12. Instagram (URL original, clicável)
+        const instagramHtml = res.google.instagramUrl && res.google.instagramUrl !== 'N/A' ? `
+            <a href="${res.google.instagramUrl}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.instagramUrl}</a>
+        ` : '-';
+
+        // 13. Ano de Fundação
+        const foundingYearHtml = res.biz.data_abertura ? String(res.biz.data_abertura).slice(0, 4) : '-';
 
         tr.innerHTML = `
             <td>${googleNameHtml}</td>
-            <td style="min-width: 200px;">${addressHtml}</td>
-            <td>${socialHtml}</td>
+            <td style="min-width: 180px;">${addressHtml}</td>
+            <td>${cepHtml}</td>
+            <td>${cidadeHtml}</td>
+            <td>${estadoHtml}</td>
+            <td>${paisHtml}</td>
+            <td>${telefoneHtml}</td>
             <td>${cnpjHtml}</td>
             <td>${razaoHtml}</td>
-            <td>${foundingHtml}</td>
             <td style="max-width: 320px;">${deepHtml}</td>
+            <td style="max-width: 200px;">${websiteHtml}</td>
+            <td style="max-width: 200px;">${instagramHtml}</td>
+            <td>${foundingYearHtml}</td>
         `;
         tableBody.appendChild(tr);
     });
@@ -181,7 +197,7 @@ function formatCNPJ(cnpj) {
 function exportMasterCSV() {
     if (!window.lastMasterResults) return;
 
-    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Data de Fundação;Sócios;Telefones Live;Website;Instagram\n';
+    let csv = 'Nome do Negócio;Endereço;CEP;Cidade;Estado;País;Telefone (Google);CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram;Ano de Fundação\n';
     window.lastMasterResults.forEach(res => {
         const sociosStr = res.deep.socios.map(s => `${s.nome} (${s.fim})`).join(' | ');
         const telsList = [];
@@ -194,15 +210,20 @@ function exportMasterCSV() {
 
         const row = [
             res.google.nome,
-            res.google.endereco,
+            res.google.rua_numero,
+            res.google.cep,
+            res.google.cidade,
+            res.google.estado,
+            res.google.pais,
+            res.google.telefone,
             formatCNPJ(res.biz.cnpj),
             res.biz.razao_social,
-            formatFoundingDate(res.biz.data_abertura),
             sociosStr,
             telsList.join(' | '),
             res.google.website,
-            res.google.instagram
-        ].map(val => `"${val.toString().replace(/"/g, '""')}"`);
+            res.google.instagramUrl,
+            res.biz.data_abertura ? String(res.biz.data_abertura).slice(0, 4) : ''
+        ].map(val => `"${(val || '').toString().replace(/"/g, '""')}"`);
 
         csv += row.join(';') + '\n';
     });

@@ -246,15 +246,31 @@ async function getPlaceDetails(placeId) {
             params: {
                 place_id: placeId,
                 key: GOOGLE_API_KEY,
-                fields: "formatted_phone_number,website,formatted_address",
+                fields: "formatted_phone_number,website,formatted_address,address_component",
                 language: "pt-BR"
             }
         });
         const result = response.data.result || {};
+        const components = result.address_components || [];
+
+        const getComponent = (type, useShort = false) => {
+            const c = components.find(comp => comp.types.includes(type));
+            if (!c) return '';
+            return useShort ? c.short_name : c.long_name;
+        };
+
+        const rua = getComponent('route');
+        const numero = getComponent('street_number');
+
         return {
             telefone: result.formatted_phone_number || "N/A",
             website: result.website || "N/A",
-            endereco_completo: result.formatted_address || "N/A"
+            endereco_completo: result.formatted_address || "N/A",
+            rua_numero: [rua, numero].filter(Boolean).join(', ') || "N/A",
+            cep: getComponent('postal_code') || "N/A",
+            cidade: getComponent('administrative_area_level_2') || getComponent('locality') || "N/A",
+            estado: getComponent('administrative_area_level_1', true) || "N/A",
+            pais: getComponent('country') || "N/A"
         };
     } catch (e) {
         return {};
@@ -265,6 +281,11 @@ function extractInstagram(website) {
     if (!website || website === "N/A") return "N/A";
     const match = website.toLowerCase().match(/instagram\.com\/([^/?]+)/);
     return match ? `@${match[1]}` : "N/A";
+}
+
+function extractInstagramUrl(website) {
+    if (!website || website === "N/A") return "N/A";
+    return website.toLowerCase().includes('instagram.com') ? website : "N/A";
 }
 
 const PALAVRAS_EXCLUIR = [
@@ -420,9 +441,15 @@ async function runGoogleSearch(estado, cidades, segment, limit = 0) {
                     allResults.push({
                         nome: place.nome,
                         endereco: fullAddress,
+                        rua_numero: details.rua_numero || 'N/A',
+                        cep: details.cep || 'N/A',
+                        cidade: details.cidade || 'N/A',
+                        estado: details.estado || 'N/A',
+                        pais: details.pais || 'N/A',
                         telefone: details.telefone || 'N/A',
                         website: details.website || 'N/A',
                         instagram: extractInstagram(details.website),
+                        instagramUrl: extractInstagramUrl(details.website),
                         place_id: place.place_id,
                         types: place.types || []
                     });
