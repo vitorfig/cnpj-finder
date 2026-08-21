@@ -10,6 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CNPJ_BIZ_TOKEN = process.env.CNPJ_BIZ_TOKEN;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CUSTOM_SEARCH_API_KEY = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
+const GOOGLE_CUSTOM_SEARCH_CX = process.env.GOOGLE_CUSTOM_SEARCH_CX;
 const USE_MOCK = process.env.USE_MOCK === 'true';
 const AUTH_EMAIL = process.env.AUTH_EMAIL;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
@@ -286,6 +288,37 @@ function extractInstagram(website) {
 function extractInstagramUrl(website) {
     if (!website || website === "N/A") return "N/A";
     return website.toLowerCase().includes('instagram.com') ? website : "N/A";
+}
+
+// Caminhos do Instagram que não são perfis (posts, reels, etc.) — não servem como link do negócio
+const INSTAGRAM_RESERVED_PATHS = new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct']);
+
+// Busca ativa do Instagram via Google Custom Search, usada como fallback quando
+// o Google Maps não tem link nenhum cadastrado (nem site nem Instagram) pro local.
+async function searchInstagramFallback(nome, cidade) {
+    if (!GOOGLE_CUSTOM_SEARCH_API_KEY || !GOOGLE_CUSTOM_SEARCH_CX) return null;
+    try {
+        const query = `${nome} ${cidade || ''} instagram`.trim();
+        const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+            params: {
+                q: query,
+                num: 5,
+                key: GOOGLE_CUSTOM_SEARCH_API_KEY,
+                cx: GOOGLE_CUSTOM_SEARCH_CX
+            }
+        });
+        const items = response.data.items || [];
+        for (const item of items) {
+            const match = (item.link || '').toLowerCase().match(/instagram\.com\/([a-z0-9_.]+)/);
+            if (match && !INSTAGRAM_RESERVED_PATHS.has(match[1])) {
+                return `https://www.instagram.com/${match[1]}/`;
+            }
+        }
+        return null;
+    } catch (e) {
+        console.error('   [Instagram Fallback] Erro:', e.response?.data?.error?.message || e.message);
+        return null;
+    }
 }
 
 const PALAVRAS_EXCLUIR = [
@@ -860,6 +893,16 @@ app.post('/api/master/search', async (req, res) => {
             let bizData = null;
             let deepData = { socios: [] };
             const cityFromPlace = cidades.find(c => normalize(place.endereco).includes(normalize(c)));
+
+            if (!place.instagramUrl || place.instagramUrl === 'N/A') {
+                const foundUrl = await searchInstagramFallback(place.nome, cityFromPlace || estado);
+                if (foundUrl) {
+                    place.instagramUrl = foundUrl;
+                    place.instagram = extractInstagram(foundUrl);
+                    place.instagramFonte = 'busca_ativa';
+                }
+            }
+
             bizData = await runBizSearchForCompany(place.nome, place.endereco, segment, cityFromPlace, estado);
             if (bizData && seenCnpjs.has(bizData.cnpj)) {
                 console.log(`   🔄 CNPJ duplicado ignorado: ${bizData.cnpj}`);

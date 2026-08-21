@@ -160,8 +160,11 @@ function renderMasterResults(results) {
         ` : '-';
 
         // 12. Instagram (URL original, clicável)
+        const instagramBadge = res.google.instagramFonte === 'busca_ativa'
+            ? `<span class="chip chip-gray" style="font-size: 0.6rem; padding: 0.1rem 0.4rem; margin-left: 6px; vertical-align: middle;" title="Encontrado por busca ativa (Google), não cadastrado no Google Maps — confira antes de usar">busca ativa</span>`
+            : '';
         const instagramHtml = res.google.instagramUrl && res.google.instagramUrl !== 'N/A' ? `
-            <a href="${res.google.instagramUrl}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.instagramUrl}</a>
+            <a href="${res.google.instagramUrl}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.instagramUrl}</a>${instagramBadge}
         ` : '-';
 
         // 13. Dia de Fundação
