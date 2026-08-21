@@ -447,7 +447,7 @@ async function runGoogleSearch(estado, cidades, segment, limit = 0) {
                         estado: details.estado || 'N/A',
                         pais: details.pais || 'N/A',
                         telefone: details.telefone || 'N/A',
-                        website: details.website || 'N/A',
+                        website: (details.website && !details.website.toLowerCase().includes('instagram.com')) ? details.website : 'N/A',
                         instagram: extractInstagram(details.website),
                         instagramUrl: extractInstagramUrl(details.website),
                         place_id: place.place_id,
