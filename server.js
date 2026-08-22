@@ -300,6 +300,7 @@ async function searchInstagramFallback(nome, cidade) {
     try {
         const query = `${nome} ${cidade || ''} instagram`.trim();
         const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+            timeout: 8000,
             params: {
                 q: query,
                 num: 5,
