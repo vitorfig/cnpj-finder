@@ -1026,9 +1026,15 @@ async function runTextSearch(stateName, segment, limit = 0) {
                         place_id: place.place_id,
                         nome: place.name || "N/A",
                         endereco: place.formatted_address || details.endereco_completo || "N/A",
+                        rua_numero: details.rua_numero || 'N/A',
+                        cep: details.cep || 'N/A',
+                        cidade: details.cidade || 'N/A',
+                        estado: details.estado || 'N/A',
+                        pais: details.pais || 'N/A',
                         telefone: details.telefone || 'N/A',
-                        website: details.website || 'N/A',
+                        website: (details.website && !details.website.toLowerCase().includes('instagram.com')) ? details.website : 'N/A',
                         instagram: extractInstagram(details.website),
+                        instagramUrl: extractInstagramUrl(details.website),
                         types: place.types || []
                     });
                 }
@@ -1099,6 +1105,15 @@ app.post('/api/national/search', async (req, res) => {
             // Mirror Busca Completa: find city by matching IBGE names against the address
             const cidadesDoEstado = ibgeCidades[place.uf] || [];
             const cityFromPlace = cidadesDoEstado.find(c => normalize(place.endereco).includes(normalize(c)));
+
+            if (!place.instagramUrl || place.instagramUrl === 'N/A') {
+                const foundUrl = await searchInstagramFallback(place.nome, cityFromPlace || place.uf);
+                if (foundUrl) {
+                    place.instagramUrl = foundUrl;
+                    place.instagram = extractInstagram(foundUrl);
+                    place.instagramFonte = 'busca_ativa';
+                }
+            }
 
             let bizData = await runBizSearchNational(place.nome, place.endereco, segment, cityFromPlace, place.uf);
             if (bizData && seenCnpjs.has(bizData.cnpj)) bizData = null;

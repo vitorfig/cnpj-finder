@@ -71,35 +71,41 @@ function renderNationalResults(results) {
     tableBody.innerHTML = '';
 
     if (results.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">Nenhum resultado encontrado.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 2rem; color: var(--text-muted);">Nenhum resultado encontrado.</td></tr>';
         return;
     }
 
     results.forEach(res => {
         const tr = document.createElement('tr');
 
+        // 1. Nome do Negócio
         const googleNameHtml = `<div style="font-weight: 700; color: var(--merkos-red); font-size: 1rem;">${res.google.nome}</div>`;
-        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${res.google.endereco}</div>`;
 
-        const socialHtml = `
-            <div style="display: flex; flex-direction: column; gap: 8px; text-align: center;">
-                ${res.google.website !== 'N/A' ? `<a href="${res.google.website}" target="_blank" class="secondary-btn" style="text-align:center; font-size:0.75rem;">🌐 Website</a>` : ''}
-                ${res.google.instagram !== 'N/A' ? `<a href="https://instagram.com/${res.google.instagram.replace('@', '')}" target="_blank" class="secondary-btn" style="text-align:center; font-size:0.75rem; background:#fee2e2; color:#b91c1c;">📸 Instagram</a>` : ''}
-                ${res.google.telefone !== 'N/A' ? `<div style="font-size: 0.75rem; color: var(--text-muted); text-align:center;">📞 ${res.google.telefone}</div>` : ''}
-            </div>
-        `;
+        // 2. Endereço (rua e número, com CEP junto)
+        const ruaNumero = res.google.rua_numero && res.google.rua_numero !== 'N/A' ? res.google.rua_numero : '-';
+        const enderecoCompleto = res.google.cep && res.google.cep !== 'N/A' ? `${ruaNumero}, CEP: ${res.google.cep}` : ruaNumero;
+        const addressHtml = `<div style="font-size: 0.8125rem; color: var(--text-main); font-weight: 500;">${enderecoCompleto}</div>`;
 
+        // 3-5. Cidade / Estado / País
+        const cidadeHtml = res.google.cidade && res.google.cidade !== 'N/A' ? res.google.cidade : '-';
+        const estadoHtml = res.google.estado && res.google.estado !== 'N/A' ? res.google.estado : '-';
+        const paisHtml = res.google.pais && res.google.pais !== 'N/A' ? res.google.pais : '-';
+
+        // 6. Telefone (Google)
+        const telefoneHtml = res.google.telefone && res.google.telefone !== 'N/A' ? res.google.telefone : '-';
+
+        // 7. CNPJ
         const cnpjHtml = res.biz.cnpj !== 'Não encontrado' ? `
             <div style="font-weight: 700; font-size: 0.875rem;">${formatNationalCNPJ(res.biz.cnpj)}</div>
             <div style="margin-top: 6px;"><span class="chip ${(res.biz.score || 0) >= 120 ? 'chip-green' : 'chip-blue'}">${res.biz.score || 0} Match Score</span></div>
         ` : `<span class="chip chip-gray">N/A</span>`;
 
+        // 8. Razão Social
         const razaoHtml = res.biz.razao_social && res.biz.razao_social !== 'N/A' ? `
             <div style="font-weight: 600; font-size: 0.875rem;">${res.biz.razao_social}</div>
         ` : `<span class="chip chip-gray">Não localizada</span>`;
 
-        const foundingHtml = `<div style="font-size: 0.875rem;">${formatFoundingDate(res.biz.data_abertura)}</div>`;
-
+        // 9. Sócios & WhatsApp (Live)
         let deepHtml = '';
         if (res.deep.socios && res.deep.socios.length > 0) {
             res.deep.socios.forEach(s => {
@@ -126,14 +132,35 @@ function renderNationalResults(results) {
             deepHtml = '<span class="chip chip-gray">Sem dados de sócios</span>';
         }
 
+        // 10. Website (URL original, clicável)
+        const websiteHtml = res.google.website && res.google.website !== 'N/A' ? `
+            <a href="${res.google.website}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.website}</a>
+        ` : '-';
+
+        // 11. Instagram (URL original, clicável)
+        const instagramBadge = res.google.instagramFonte === 'busca_ativa'
+            ? `<span class="chip chip-gray" style="font-size: 0.6rem; padding: 0.1rem 0.4rem; margin-left: 6px; vertical-align: middle;" title="Encontrado por busca ativa (Google), não cadastrado no Google Maps — confira antes de usar">busca ativa</span>`
+            : '';
+        const instagramHtml = res.google.instagramUrl && res.google.instagramUrl !== 'N/A' ? `
+            <a href="${res.google.instagramUrl}" target="_blank" style="font-size: 0.8125rem; word-break: break-all;">${res.google.instagramUrl}</a>${instagramBadge}
+        ` : '-';
+
+        // 12. Dia de Fundação
+        const foundingHtml = formatFoundingDate(res.biz.data_abertura);
+
         tr.innerHTML = `
             <td>${googleNameHtml}</td>
             <td style="min-width: 200px;">${addressHtml}</td>
-            <td>${socialHtml}</td>
+            <td>${cidadeHtml}</td>
+            <td>${estadoHtml}</td>
+            <td>${paisHtml}</td>
+            <td>${telefoneHtml}</td>
             <td>${cnpjHtml}</td>
             <td>${razaoHtml}</td>
-            <td>${foundingHtml}</td>
             <td style="max-width: 320px;">${deepHtml}</td>
+            <td style="max-width: 200px;">${websiteHtml}</td>
+            <td style="max-width: 200px;">${instagramHtml}</td>
+            <td>${foundingHtml}</td>
         `;
         tableBody.appendChild(tr);
     });
@@ -151,7 +178,7 @@ function formatNationalCNPJ(cnpj) {
 function exportNationalCSV() {
     if (!window.lastNationalResults || window.lastNationalResults.length === 0) return;
 
-    let csv = 'Empresa (Google);Endereço;CNPJ;Razão Social;Data de Fundação;Sócios;Telefones Live;Website;Instagram\n';
+    let csv = 'Nome do Negócio;Endereço;Cidade;Estado;País;Telefone (Google);CNPJ;Razão Social;Sócios;Telefones Live;Website;Instagram;Dia de Fundação\n';
     window.lastNationalResults.forEach(res => {
         const sociosStr = (res.deep.socios || []).map(s => `${s.nome} (${s.fim})`).join(' | ');
         const telsList = [];
@@ -160,16 +187,23 @@ function exportNationalCSV() {
             telsList.push(`${prefix}${t.display} (${s.nome.split(' ')[0]})`);
         }));
 
+        const ruaNumero = res.google.rua_numero && res.google.rua_numero !== 'N/A' ? res.google.rua_numero : '';
+        const enderecoCompleto = res.google.cep && res.google.cep !== 'N/A' ? `${ruaNumero}, CEP: ${res.google.cep}` : ruaNumero;
+
         const row = [
             res.google.nome,
-            res.google.endereco,
+            enderecoCompleto,
+            res.google.cidade || 'N/A',
+            res.google.estado || 'N/A',
+            res.google.pais || 'N/A',
+            res.google.telefone || 'N/A',
             formatNationalCNPJ(res.biz.cnpj),
             res.biz.razao_social || 'N/A',
-            formatFoundingDate(res.biz.data_abertura),
             sociosStr,
             telsList.join(' | '),
             res.google.website || 'N/A',
-            res.google.instagram || 'N/A'
+            res.google.instagramUrl || 'N/A',
+            formatFoundingDate(res.biz.data_abertura)
         ].map(val => `"${(val || '').toString().replace(/"/g, '""')}"`);
 
         csv += row.join(';') + '\n';
