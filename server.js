@@ -1092,9 +1092,13 @@ async function findGooglePlaceId(nome, cidade) {
                 language: 'pt-BR'
             }
         });
+        if (res.data.status !== 'OK') {
+            console.error('   [FindPlace] Status não-OK:', res.data.status, res.data.error_message || '');
+        }
         const candidates = res.data.candidates || [];
         return candidates.length > 0 ? candidates[0].place_id : null;
     } catch (e) {
+        console.error('   [FindPlace] Erro:', e.response?.data?.error_message || e.message);
         return null;
     }
 }
