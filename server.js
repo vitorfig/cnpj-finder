@@ -1053,6 +1053,113 @@ async function runTextSearch(stateName, segment, limit = 0) {
     return allResults;
 }
 
+/**********************************************************************************
+ * BUSCA POR LISTA (Nome + CNPJ + Instagram opcional) — funções novas, isoladas.
+ * Não reutiliza/edita nada das buscas existentes, só chama funções já existentes
+ * (getPlaceDetails, extractInstagram, searchInstagramFallback, runDeepSearchForCnpj)
+ * como estão, sem alterá-las.
+ **********************************************************************************/
+
+async function lookupCnpjOfficial(cnpj) {
+    try {
+        const res = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { timeout: 10000 });
+        const d = res.data || {};
+        const ruaNumero = [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(' ').trim();
+        return {
+            razao_social: d.razao_social || 'N/A',
+            nome_fantasia: d.nome_fantasia || '',
+            data_abertura: d.data_inicio_atividade || null,
+            rua_numero: d.numero ? `${ruaNumero}, ${d.numero}` : (ruaNumero || 'N/A'),
+            cep: d.cep ? String(d.cep).replace(/(\d{5})(\d{3})/, '$1-$2') : 'N/A',
+            cidade: d.municipio || 'N/A',
+            estado: d.uf || 'N/A',
+            pais: 'Brasil'
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+async function findGooglePlaceId(nome, cidade) {
+    try {
+        const res = await axios.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json', {
+            timeout: 8000,
+            params: {
+                input: `${nome} ${cidade || ''}`.trim(),
+                inputtype: 'textquery',
+                fields: 'place_id',
+                key: GOOGLE_API_KEY,
+                language: 'pt-BR'
+            }
+        });
+        const candidates = res.data.candidates || [];
+        return candidates.length > 0 ? candidates[0].place_id : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function enrichSingleItem(nome, cnpjRaw, instagramProvided) {
+    const cnpjClean = String(cnpjRaw || '').replace(/\D/g, '');
+    const oficial = cnpjClean.length === 14 ? await lookupCnpjOfficial(cnpjClean) : null;
+    const cidade = oficial ? oficial.cidade : null;
+
+    let telefone = 'N/A';
+    let website = 'N/A';
+    let instagramUrl = instagramProvided && instagramProvided.trim() ? instagramProvided.trim() : 'N/A';
+    let instagramFonte = instagramUrl !== 'N/A' ? 'fornecido' : null;
+
+    const placeId = await findGooglePlaceId(nome, cidade);
+    if (placeId) {
+        const details = await getPlaceDetails(placeId);
+        telefone = details.telefone || 'N/A';
+        const rawWebsite = details.website || 'N/A';
+        website = (rawWebsite !== 'N/A' && !rawWebsite.toLowerCase().includes('instagram.com')) ? rawWebsite : 'N/A';
+
+        if (instagramUrl === 'N/A') {
+            const fromPlaces = extractInstagramUrl(rawWebsite);
+            if (fromPlaces !== 'N/A') {
+                instagramUrl = fromPlaces;
+                instagramFonte = 'google_maps';
+            }
+        }
+    }
+
+    if (instagramUrl === 'N/A') {
+        const found = await searchInstagramFallback(nome, cidade);
+        if (found) {
+            instagramUrl = found;
+            instagramFonte = 'busca_ativa';
+        }
+    }
+
+    const deepData = cnpjClean.length === 14 ? await runDeepSearchForCnpj(cnpjClean) : { socios: [] };
+
+    return {
+        google: {
+            nome,
+            rua_numero: oficial ? oficial.rua_numero : 'N/A',
+            cep: oficial ? oficial.cep : 'N/A',
+            cidade: oficial ? oficial.cidade : 'N/A',
+            estado: oficial ? oficial.estado : 'N/A',
+            pais: oficial ? oficial.pais : 'N/A',
+            telefone,
+            website,
+            instagram: extractInstagram(instagramUrl),
+            instagramUrl,
+            instagramFonte
+        },
+        biz: {
+            cnpj: cnpjClean || 'Não encontrado',
+            razao_social: oficial ? oficial.razao_social : 'N/A',
+            nome_fantasia: oficial ? oficial.nome_fantasia : '',
+            cidade: oficial ? oficial.cidade : 'N/A',
+            data_abertura: oficial ? oficial.data_abertura : null
+        },
+        deep: deepData
+    };
+}
+
 app.post('/api/national/search', async (req, res) => {
     const { estados, segment, limit, skipList } = req.body;
     if (!estados || estados.length === 0 || !segment) {
@@ -1130,6 +1237,24 @@ app.post('/api/national/search', async (req, res) => {
             });
         }
 
+        res.json(finalResults);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/enrich/search', async (req, res) => {
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Envie ao menos um item (Nome + CNPJ)." });
+    }
+
+    try {
+        const finalResults = [];
+        for (const item of items) {
+            const result = await enrichSingleItem(item.nome, item.cnpj, item.instagram);
+            finalResults.push(result);
+        }
         res.json(finalResults);
     } catch (e) {
         res.status(500).json({ error: e.message });
