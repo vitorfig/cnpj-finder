@@ -166,7 +166,7 @@ function initGoogleSearch() {
                 <td>${formatValue(place.telefone)}</td>
                 <td style="display: flex; flex-direction: column; gap: 4px;">
                     ${formatWebsite(place.website)}
-                    ${place.instagram !== 'N/A' ? `<a href="https://instagram.com/${place.instagram.replace('@', '')}" target="_blank" class="secondary-btn" style="background:#fee2e2; color:#b91c1c; text-align:center;">📸 @${place.instagram.replace('@', '')}</a>` : ''}
+                    ${place.instagram !== 'N/A' ? `<a href="https://instagram.com/${place.instagram.replace('@', '')}" target="_blank" class="secondary-btn" style="background:#dbeafe; color:#1e40af; text-align:center;">📸 @${place.instagram.replace('@', '')}</a>` : ''}
                 </td>
             `;
 
